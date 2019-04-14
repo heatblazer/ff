@@ -52,6 +52,8 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "constants.h"
+#include "utils.h"
 
 /* USER CODE END Includes */
 
@@ -67,7 +69,7 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
+#define FF_DELAY_TIME 1
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

@@ -42,6 +42,8 @@
 extern volatile int	proba;
 extern volatile int	boza;
 extern uint16_t adc[4];
+extern char rxData[30];
+extern char rxFlag;
 
 /* USER CODE END Includes */
 
@@ -79,6 +81,7 @@ extern uint16_t adc[4];
 extern DMA_HandleTypeDef hdma_adc1;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim10;
+extern UART_HandleTypeDef huart6;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -255,15 +258,20 @@ else
   {
 	  HAL_GPIO_WritePin(GPIOA, DIR_GRIP_Pin, 0);
   }
-  else { HAL_GPIO_WritePin(GPIOA, DIR_GRIP_Pin, 1);  }
+  else HAL_GPIO_WritePin(GPIOA, DIR_GRIP_Pin, 1);
 
   if (adc[1] > 100)
   {
 	  HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 1);
-	  HAL_GPIO_TogglePin(GPIOA, STEP_GRIP_Pin);
+	  //HAL_GPIO_TogglePin(GPIOA, STEP_GRIP_Pin);
+	  HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 1);
+	  proba ++;
+	  if (proba == 0) {proba++;} else {proba--;}
+	  proba--;
+	  HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 0);
   }
   else
-  {HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);}
+	  HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
 
 
 
@@ -281,8 +289,24 @@ void DMA2_Stream0_IRQHandler(void)
   /* USER CODE END DMA2_Stream0_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_adc1);
   /* USER CODE BEGIN DMA2_Stream0_IRQn 1 */
-
+  //HAL_GPIO_TogglePin (GPIOC, LED_Pin);
   /* USER CODE END DMA2_Stream0_IRQn 1 */
+}
+
+/**
+  * @brief This function handles USART6 global interrupt.
+  */
+void USART6_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART6_IRQn 0 */
+
+  /* USER CODE END USART6_IRQn 0 */
+  HAL_UART_IRQHandler(&huart6);
+  /* USER CODE BEGIN USART6_IRQn 1 */
+  rxFlag = 1;
+
+
+  /* USER CODE END USART6_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
