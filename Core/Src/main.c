@@ -109,7 +109,7 @@ volatile int proba = 0;
 volatile int boza = 0;
 volatile uint16_t adc[4];
 float dac1_volt = 0.5;
-float dac2_volt = 1;
+float dac2_volt = 0.5;
 uint8_t dac1_byte;
 uint8_t dac2_byte;
 uint16_t index_rot = 0;
@@ -126,9 +126,15 @@ int  positionRot = 0;
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
 
 
+motor_ctx gMotor ;
+
+
 int main(void) {
 	/* USER CODE BEGIN 1 */
 	int loop_counter = 0;
+	memset(&gMotor, 0, sizeof(motor_ctx));
+	gMotor.initState = 0;
+	test_flag = 0;
 	uint16_t adc_history[2][10] = { { 0 } };
 	/* USER CODE END 1 */
 	/* MCU Configuration--------------------------------------------------------*/
@@ -170,8 +176,13 @@ int main(void) {
 	HAL_GPIO_WritePin(GPIOB, MS1_GRIP_Pin, 1);
 	HAL_GPIO_WritePin(GPIOB, MS2_GRIP_Pin, 1);
 	HAL_GPIO_WritePin(GPIOA, MS3_GRIP_Pin, 1);
-	proba = 1;
-	boza = 400;
+
+	// pepare motor data
+	gMotor.hdac = &hdac;
+	gMotor.dac1_byte = dac1_byte;
+	gMotor.dac2_byte = dac2_byte;
+	gMotor.dac1_volt = dac1_volt;
+	gMotor.dac2_volt = dac2_volt;
 	//   void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)    -  vika podprograma pri napulnen uart bufer ????
 	//-------------------------------- Config End   PHF
 	/* USER CODE END 2 */
@@ -182,11 +193,7 @@ int main(void) {
 		//	  int a;
 		//test1:
 		//	a = 0;
-		//	goto test1;
-		if (adc[0] > 100) {
-			TIM5->CNT = 0;
-			positionRot = 0;
-		}
+		//	goto test1
 
 		if (rxFlag == 1) {
 			rxFlag = 0;
@@ -198,15 +205,21 @@ int main(void) {
 
 			if (rxBuffer == 0x0D) {   // call - analyze
 				if (!strncmp(rxData, FF_Open, strlen(FF_Open))) {
-					HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 					memset(rxData, 0, sizeof(rxData));
+					test_flag = 1;
+					gMotor.dac1_volt = 38;
+					HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Close, strlen(FF_Close))) {
 					memset(rxData, 0, sizeof(rxData));
+					test_flag = 0;
+					gMotor.dac1_volt = 8;
+					HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Init, strlen(FF_Init))) {
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
+					gMotor.initState = 2;
 				} else if (!strncmp(rxData, FF_Left, strlen(FF_Left))) {
 					int test1, test2;
 					FF_parse_args(rxData, &test1, &test2);
@@ -229,15 +242,17 @@ int main(void) {
 				}
 			}
 		}
+		InitMotor(&gMotor);
 
 		int adc_h_it = 0;
-		if (loop_counter > 2) {
+		if (loop_counter > FF_DELAY_COUNTER) {
 			// do work
 			adc_history[0][adc_h_it++ % 10] = adc[0];
 			adc_history[1][adc_h_it++ % 10] = adc[1];
 			loop_counter = 0;
-		} else
+		} else {
 			loop_counter++;
+		}
 
 		//	  if (HAL_GPIO_ReadPin(GPIOC,ROT_INDEX_Pin) == 1)
 		//	  		{HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
@@ -285,30 +300,7 @@ int main(void) {
 		}
 #endif
 
-		//HAL_Delay(5);
 
-		encRot = TIM5->CNT;
-		encGrip = TIM2->CNT;
-
-		if (encRot == 0)
-			encRot = 1;
-
-		double razlika;
-		// razlika = (( (double) positionRot / encRot) * 1000000);
-		razlika = ((double) positionRot - (encRot * 1.6) + 100);
-
-		char c[64];
-		// memset(txData, 0, 32);
-		memset(c, 0, sizeof(c));
-		snprintf(c, sizeof(c), "RotEnc %u Cnt %u razl %u\n\r", encRot,
-				positionRot, (unsigned int) razlika);
-
-		/*          ---- tova trqbva da stane funkciq
-
-		 HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 1);
-		 HAL_UART_Transmit(&huart6, (uint8_t *)c, strlen(c), 10);  // 5 e duljina na izprashtaniq paket, 10 e milisekundi timeout
-		 HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 0);
-		 */
 #if 0
 		HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 1);
 		HAL_UART_Transmit_IT(&huart6, (uint8_t *)c, strlen(c)); // 5 e duljina na izprashtaniq paket, 10 e milisekundi timeout

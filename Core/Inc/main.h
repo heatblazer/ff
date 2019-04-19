@@ -54,12 +54,12 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include "constants.h"
 #include "utils.h"
-
+#include "motor.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+uint32_t test_flag;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -70,6 +70,7 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 #define FF_DELAY_TIME 1
+#define FF_DELAY_COUNTER 10
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

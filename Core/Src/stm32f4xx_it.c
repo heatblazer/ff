@@ -226,15 +226,34 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles TIM1 update interrupt and TIM10 global interrupt.
   */
+
+
 void TIM1_UP_TIM10_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_UP_TIM10_IRQn 0 */
+ static uint32_t counter = 50000;
 
+ TIM1->ARR = counter;
+
+ HAL_TIM_IRQHandler(&htim1);
+ HAL_TIM_IRQHandler(&htim10);
+
+ if (test_flag == 1) {
+	 if (counter != 10000)
+	 	 counter -= 100;
+	  HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);
+			for(int i=0; i < 3; i++)
+				  __asm__ __volatile__ ("nop\n\t");
+	  HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 0);
   /* USER CODE END TIM1_UP_TIM10_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim1);
-  HAL_TIM_IRQHandler(&htim10);
+ }
+ else
+ {
+	 counter = 50000;
+ }
   /* USER CODE BEGIN TIM1_UP_TIM10_IRQn 1 */
 
+  //HAL_GPIO_TogglePin (GPIOC, LED_Pin);
                                    /*
 if (boza > 0)
 { boza--;
@@ -253,7 +272,7 @@ HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);
 else
 {HAL_GPIO_WritePin(GPIOB, SLEEP_ROT_Pin, 0);}
 */
-
+#if 0
   if (adc[0] > 100)
   {
 	  HAL_GPIO_WritePin(GPIOA, DIR_GRIP_Pin, 0);
@@ -273,7 +292,7 @@ else
   else
 	  HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
 
-
+#endif
 
 
   /* USER CODE END TIM1_UP_TIM10_IRQn 1 */
