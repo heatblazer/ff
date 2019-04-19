@@ -5,25 +5,14 @@
  *      Author: ilian
  */
 
-#include "stm32f4xx_hal.h"
-#include "main.h"
+#include "defs.h"
 #include "motor.h"
+#include "utils.h"
 
 //
 //	Details:{Instance = 0x40010000, Init = {Prescaler = 2, CounterMode = 0, Period = 2500, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_READY}
 
-
-//	  if (HAL_GPIO_ReadPin(GPIOC,ROT_INDEX_Pin) == 1)
-//	  		{HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
-//	  else {HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);}
-
-#if 0
-dac1_byte = (uint8_t) ((dac1_volt / 3.3) * 255);
-	dac2_byte = (uint8_t) ((dac2_volt / 3.3) * 255);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, dac1_byte);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, dac2_byte);
-#endif
-
+extern UART_HandleTypeDef huart6;
 
 
 #define DELAY_LOOP 2000
@@ -107,7 +96,7 @@ void InitMotor(motor_ctx* motor)
 
 		TIM2->CNT = 10000;
 		motor->dac1_volt = 23;
-		HAL_DAC_SetValue(motor->hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)motor->dac1_volt);
+		HAL_DAC_SetValue(&motor->hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)motor->dac1_volt);
 		HAL_GPIO_WritePin(GPIOB, SLEEP_ROT_Pin, 1);// enable rotor power
 
 		uint32_t rotcounter = 0;
@@ -138,8 +127,29 @@ void InitMotor(motor_ctx* motor)
 		}
 
 		motor->dac1_volt = 8;
-		HAL_DAC_SetValue(motor->hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)motor->dac1_volt);
+		HAL_DAC_SetValue(&motor->hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)motor->dac1_volt);
 		TIM5->CNT = 1000000;
 	}
 }
+
+
+void OpenMotor(motor_ctx* motor)
+{
+
+}
+
+
+void MotorStatus(motor_ctx* motor)
+{
+	if (!motor)
+		return;
+
+	static char msg[64];
+	snprintf(msg, sizeof(msg), "Status: state (%d), dac1(%d) dac2(%d)", motor->initState,
+			(uint8_t)motor->dac1_volt, (uint8_t)motor->dac2_volt);
+	FF_UPrint(&huart6, msg, sizeof(msg));
+	memset(msg, 0, sizeof(msg));
+}
+
+
 

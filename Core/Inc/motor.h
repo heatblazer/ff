@@ -7,7 +7,7 @@
 
 #ifndef INC_MOTOR_H_
 #define INC_MOTOR_H_
-#include <stdint.h>
+#include "defs.h"
 
 typedef enum MotorInitStates
 {
@@ -27,15 +27,15 @@ typedef struct motor_context_t
 	uint8_t dac2_byte;
 	float dac1_volt;
 	float dac2_volt;
-	DAC_HandleTypeDef* hdac;
+	DAC_HandleTypeDef hdac;
 } motor_ctx;
 
 
 extern void InitMotor(motor_ctx* motor);
 
-extern void Open(motor_ctx* motor);
+extern void OpenMotor(motor_ctx* motor);
 
-
+extern void MotorStatus(motor_ctx* motor);
 
 
 #endif /* INC_MOTOR_H_ */

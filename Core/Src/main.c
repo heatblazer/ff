@@ -43,8 +43,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
-#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -58,8 +56,6 @@
 
  // double timerG = 0;
 
-
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -70,11 +66,8 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
-
 CAN_HandleTypeDef hcan1;
-
-DAC_HandleTypeDef hdac;
-
+//DAC_HandleTypeDef hdac;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
@@ -105,13 +98,18 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-volatile int proba = 0;
-volatile int boza = 0;
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
+
+/********************************************************************/
+// Begin Application stuff
+/********************************************************************/
+//volatile int proba = 0;
+//volatile int boza = 0;
 volatile uint16_t adc[4];
-float dac1_volt = 0.5;
-float dac2_volt = 0.5;
-uint8_t dac1_byte;
-uint8_t dac2_byte;
+//float dac1_volt = 0.5;
+//float dac2_volt = 0.5;
+//uint8_t dac1_byte;
+//uint8_t dac2_byte;
 uint16_t index_rot = 0;
 uint16_t index_grip=0;
 char rxData[30];
@@ -123,19 +121,26 @@ int  encGrip; // Tim 2
 int  encRot; // Tim 5
 int  positionRot = 0;
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
-
-
+// the motor context
 motor_ctx gMotor ;
+/********************************************************************/
+// End Application stuff
+/********************************************************************/
 
 
 int main(void) {
 	/* USER CODE BEGIN 1 */
+
 	int loop_counter = 0;
 	memset(&gMotor, 0, sizeof(motor_ctx));
 	gMotor.initState = 0;
+	gMotor.dac1_volt = 0.5f;
+	gMotor.dac2_volt = 0.5f;
+
 	test_flag = 0;
 	uint16_t adc_history[2][10] = { { 0 } };
+
+
 	/* USER CODE END 1 */
 	/* MCU Configuration--------------------------------------------------------*/
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
@@ -160,13 +165,13 @@ int main(void) {
 	/* USER CODE BEGIN 2 */
 	//----------------------------------- Config  PHF \/
 	HAL_TIM_Base_Start_IT(&htim1); // Enable IRQ Tim 1
-	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
-	HAL_DAC_Start(&hdac, DAC_CHANNEL_2);
+	HAL_DAC_Start(&gMotor.hdac, DAC_CHANNEL_1);
+	HAL_DAC_Start(&gMotor.hdac, DAC_CHANNEL_2);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adc, 4);
-	dac1_byte = (uint8_t) ((dac1_volt / 3.3) * 255);
-	dac2_byte = (uint8_t) ((dac2_volt / 3.3) * 255);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, dac1_byte);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, dac2_byte);
+	gMotor.dac1_byte = (uint8_t) ((gMotor.dac1_volt / 3.3) * 255);
+	gMotor.dac2_byte = (uint8_t) ((gMotor.dac2_volt / 3.3) * 255);
+	HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, gMotor.dac1_byte);
+	HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, gMotor.dac2_byte);
 	HAL_UART_Receive_IT(&huart6, &rxBuffer, 1);
 	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_ALL);
@@ -177,12 +182,6 @@ int main(void) {
 	HAL_GPIO_WritePin(GPIOB, MS2_GRIP_Pin, 1);
 	HAL_GPIO_WritePin(GPIOA, MS3_GRIP_Pin, 1);
 
-	// pepare motor data
-	gMotor.hdac = &hdac;
-	gMotor.dac1_byte = dac1_byte;
-	gMotor.dac2_byte = dac2_byte;
-	gMotor.dac1_volt = dac1_volt;
-	gMotor.dac2_volt = dac2_volt;
 	//   void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)    -  vika podprograma pri napulnen uart bufer ????
 	//-------------------------------- Config End   PHF
 	/* USER CODE END 2 */
@@ -208,13 +207,13 @@ int main(void) {
 					memset(rxData, 0, sizeof(rxData));
 					test_flag = 1;
 					gMotor.dac1_volt = 38;
-					HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
+					HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Close, strlen(FF_Close))) {
 					memset(rxData, 0, sizeof(rxData));
 					test_flag = 0;
 					gMotor.dac1_volt = 8;
-					HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
+					HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Init, strlen(FF_Init))) {
 					memset(rxData, 0, sizeof(rxData));
@@ -234,6 +233,7 @@ int main(void) {
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Status, strlen(FF_Status))) {
+					MotorStatus(&gMotor);
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
 				} else {
@@ -512,8 +512,8 @@ static void MX_DAC_Init(void)
   /* USER CODE END DAC_Init 1 */
   /**DAC Initialization 
   */
-  hdac.Instance = DAC;
-  if (HAL_DAC_Init(&hdac) != HAL_OK)
+  gMotor.hdac.Instance = DAC;
+  if (HAL_DAC_Init(&gMotor.hdac) != HAL_OK)
   {
     Error_Handler();
   }
@@ -521,13 +521,13 @@ static void MX_DAC_Init(void)
   */
   sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
-  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  if (HAL_DAC_ConfigChannel(&gMotor.hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
   /**DAC channel OUT2 config 
   */
-  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK)
+  if (HAL_DAC_ConfigChannel(&gMotor.hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }

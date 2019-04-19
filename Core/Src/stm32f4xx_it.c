@@ -39,11 +39,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-extern volatile int	proba;
-extern volatile int	boza;
-extern uint16_t adc[4];
-extern char rxData[30];
-extern char rxFlag;
 
 /* USER CODE END Includes */
 
@@ -82,6 +77,15 @@ extern DMA_HandleTypeDef hdma_adc1;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim10;
 extern UART_HandleTypeDef huart6;
+
+// get the motor context to be modified for IRQs
+extern motor_ctx gMotor;
+
+extern uint16_t adc[4];
+extern char rxData[30];
+extern char rxFlag;
+
+
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
