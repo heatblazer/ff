@@ -8,28 +8,9 @@
 #include "utils.h"
 
 #define FF_IS_DIGIT(x) ((x>='0') && (x <= '9'))
-
-
-#if 0
-char c[64];
-// memset(txData, 0, 32);
-memset(c, 0 ,sizeof(c));
-snprintf(c, sizeof(c), "RotEnc %u Cnt %u razl %u\n\r" , encRot, positionRot, (unsigned int) razlika);
-
-/*          ---- tova trqbva da stane funkciq
-
-HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 1);
-HAL_UART_Transmit(&huart6, (uint8_t *)c, strlen(c), 10);  // 5 e duljina na izprashtaniq paket, 10 e milisekundi timeout
-HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 0);
-*/
-#if 0
-HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 1);
-HAL_UART_Transmit_IT(&huart6, (uint8_t *)c, strlen(c));  // 5 e duljina na izprashtaniq paket, 10 e milisekundi timeout
-HAL_Delay(DELAY_TIME);
-#endif
-#endif
-
 #define FF_UART_DELAY_TIME 100
+
+
 
 void FF_UPrint(UART_HandleTypeDef* uart, const char* message, size_t size)
 {

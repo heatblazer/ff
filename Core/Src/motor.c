@@ -144,7 +144,7 @@ void MotorStatus(motor_ctx* motor)
 	if (!motor)
 		return;
 
-	static char msg[64];
+	static char msg[128];
 	snprintf(msg, sizeof(msg), "Status: state (%d), dac1(%d) dac2(%d)", motor->initState,
 			(uint8_t)motor->dac1_volt, (uint8_t)motor->dac2_volt);
 	FF_UPrint(&huart6, msg, sizeof(msg));
