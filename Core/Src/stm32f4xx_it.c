@@ -39,6 +39,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+extern volatile int	proba;
+extern volatile int	boza;
+extern uint16_t adc[4];
+extern char rxData[30];
+extern char rxFlag;
 
 /* USER CODE END Includes */
 
@@ -78,15 +83,10 @@ extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim10;
 extern UART_HandleTypeDef huart6;
 
-// get the motor context to be modified for IRQs
-extern motor_ctx gMotor;
-
-extern uint16_t adc[4];
-extern char rxData[30];
-extern char rxFlag;
 
 
 /* USER CODE BEGIN EV */
+extern motor_ctx gMotor ;
 
 /* USER CODE END EV */
 
@@ -231,76 +231,232 @@ void SysTick_Handler(void)
   * @brief This function handles TIM1 update interrupt and TIM10 global interrupt.
   */
 
+#define TEST_CNT 30000
+
+
+static uint32_t nextIrq = TEST_CNT;
+
+static uint32_t fast = 0;
+
+#define DELAY_10() for(int i=0; i < 10; i++) ;
+
+
+static void UpdateOpen()
+{
+
+	if (fast == 0)
+	{
+		nextIrq -= 250;
+	}
+
+	if (nextIrq <= 1500)
+	{
+		fast = 1;
+	}
+
+	HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 1);
+	for(int i=0; i < 10; i++) {}
+	HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 0);
+
+
+	if ((((gMotor.targetGrip/1000) + 20) - TIM2->CNT) >= 150)
+	{
+		gMotor.targetGrip = TIM2->CNT * 1000;
+		HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, 10);
+//		HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
+		fast = 0;
+		nextIrq = 30000;
+		gMotor.motorRequests = RequestFailed;
+		gMotor.targetGrip = TIM2->CNT * 1000;
+		return;
+	}
+
+	gMotor.targetGrip += 625;
+
+	if (TIM2->CNT >= 10000)
+	{
+		gMotor.targetGrip = TIM2->CNT * 1000;
+		HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, 10);
+//		HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
+		fast = 0;
+		gMotor.motorRequests = RequestOk;
+
+	}
+
+	if (TIM2->CNT >= 9950 &&  nextIrq < 30000)
+	{
+		nextIrq += 500;
+	}
+
+}
+
+
+static void UpdateClose()
+{
+
+	if (fast == 0)
+	{
+		nextIrq -= 500;
+	}
+
+	if (nextIrq <= 1500)
+	{
+		fast = 1;
+	}
+
+	HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 1);
+	for(int i=0; i < 10; i++) {}
+	HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 0);
+
+	if (((TIM2->CNT + 20) - (gMotor.targetGrip/1000)) >= 150)
+	 {
+		gMotor.targetGrip = TIM2->CNT * 1000;
+		HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, 10);
+
+//		HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
+		fast = 0;
+		nextIrq = 30000;
+		gMotor.motorRequests = RequestFailed;
+		return;
+	 }
+
+	gMotor.targetGrip -= 625;
+
+	if (TIM2->CNT <= 2800)
+	{
+		fast = 0;
+		gMotor.targetGrip = TIM2->CNT * 1000;
+		HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, 10);
+
+//		HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
+		gMotor.motorRequests = RequestOk;
+	}
+
+	if (TIM2->CNT < 2850 &&  nextIrq < 30000)
+	{
+		nextIrq += 500;
+	}
+}
+
+static void UpdateLeft()
+{
+
+	if (fast == 0)
+	{
+		nextIrq -= 500;
+	}
+
+	if (nextIrq <= 5000)
+	{
+		fast = 1;
+	}
+
+// user code
+
+	HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);
+	DELAY_10();
+	HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 0);
+
+	if (((gMotor.targetRot/1000)+ 20 - (TIM5->CNT)) >= 50)
+	{
+
+		fast = 0;
+		nextIrq = 30000;
+		HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, 8);
+		gMotor.motorRequests = RequestFailed;
+		return;
+	}
+
+	gMotor.targetRot += 625;
+
+	if (TIM5->CNT >= gMotor.movePosition)
+	{
+		fast = 0;
+		HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, 8);
+		gMotor.motorRequests = RequestOk;
+	}
+
+//
+	if (TIM5->CNT >= gMotor.movePosition-50 &&  nextIrq < 30000)
+	{
+		nextIrq += 500;
+	}
+}
+
+static void UpdateRight()
+{
+
+	if (fast == 0)
+	{
+		nextIrq -= 500;
+	}
+
+	if (nextIrq <= 5000)
+	{
+		fast = 1;
+	}
+//
+//user code
+	HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);
+	DELAY_10();
+	HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 0);
+
+	if (((TIM5->CNT)+ 20 - (gMotor.targetRot/1000)) >= 50)
+	{
+		fast = 0;
+		nextIrq = 30000;
+		HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, 8);
+		gMotor.motorRequests = RequestFailed;
+		return;
+	}
+
+	gMotor.targetRot -= 625;
+
+	if (TIM5->CNT <= gMotor.movePosition)
+	{
+		fast = 0;
+		HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, 8);
+		gMotor.motorRequests = RequestOk;
+	}
+
+	if (TIM5->CNT <= gMotor.movePosition+50 &&  nextIrq < 30000)
+	{
+		nextIrq += 500;
+	}
+
+
+}
+
 
 void TIM1_UP_TIM10_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_UP_TIM10_IRQn 0 */
- static uint32_t counter = 50000;
+	 TIM1->ARR = nextIrq;
 
- TIM1->ARR = counter;
+	 switch (gMotor.motorRequests)
+	 {
+	 case Open:
+		 UpdateOpen();
+		 break;
+	 case Close:
+		 UpdateClose();
+		 break;
+	 case RotateL:
+		 UpdateLeft();
+		 break;
+	 case RotateR:
+		 UpdateRight();
+		 break;
+	 default:
+		 break;
+	 }
 
- HAL_TIM_IRQHandler(&htim1);
- HAL_TIM_IRQHandler(&htim10);
+	 gMotor.nextIrq = nextIrq;
 
- if (test_flag == 1) {
-	 if (counter != 10000)
-	 	 counter -= 100;
-	  HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);
-			for(int i=0; i < 3; i++)
-				  __asm__ __volatile__ ("nop\n\t");
-	  HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 0);
-  /* USER CODE END TIM1_UP_TIM10_IRQn 0 */
- }
- else
- {
-	 counter = 50000;
- }
-  /* USER CODE BEGIN TIM1_UP_TIM10_IRQn 1 */
-
-  //HAL_GPIO_TogglePin (GPIOC, LED_Pin);
-                                   /*
-if (boza > 0)
-{ boza--;
-HAL_GPIO_WritePin(GPIOB, SLEEP_ROT_Pin, 1);
-HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);
-
-
-  if (proba == 0)
-  {
-  proba = 1;
-  }
-  else {proba--;}
-
-  HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 0);
+	 HAL_TIM_IRQHandler(&htim1);
+	 HAL_TIM_IRQHandler(&htim10);
 }
-else
-{HAL_GPIO_WritePin(GPIOB, SLEEP_ROT_Pin, 0);}
-*/
-#if 0
-  if (adc[0] > 100)
-  {
-	  HAL_GPIO_WritePin(GPIOA, DIR_GRIP_Pin, 0);
-  }
-  else HAL_GPIO_WritePin(GPIOA, DIR_GRIP_Pin, 1);
 
-  if (adc[1] > 100)
-  {
-	  HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 1);
-	  //HAL_GPIO_TogglePin(GPIOA, STEP_GRIP_Pin);
-	  HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 1);
-	  proba ++;
-	  if (proba == 0) {proba++;} else {proba--;}
-	  proba--;
-	  HAL_GPIO_WritePin(GPIOA, STEP_GRIP_Pin, 0);
-  }
-  else
-	  HAL_GPIO_WritePin(GPIOA, SLEEP_GRIP_Pin, 0);
-
-#endif
-
-
-  /* USER CODE END TIM1_UP_TIM10_IRQn 1 */
-}
 
 /**
   * @brief This function handles DMA2 stream0 global interrupt.

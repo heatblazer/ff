@@ -8,10 +8,6 @@
 #ifndef INC_CONSTANTS_H_
 #define INC_CONSTANTS_H_
 
-#define FF_DELAY_TIME 1
-#define FF_DELAY_COUNTER 10
-
-
 #ifdef __cplusplus
 extern "C"
 {

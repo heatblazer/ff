@@ -43,6 +43,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -56,6 +58,8 @@
 
  // double timerG = 0;
 
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,8 +70,11 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
+
 CAN_HandleTypeDef hcan1;
-//DAC_HandleTypeDef hdac;
+
+DAC_HandleTypeDef hdac;
+
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
@@ -98,18 +105,10 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
-
-/********************************************************************/
-// Begin Application stuff
-/********************************************************************/
-//volatile int proba = 0;
-//volatile int boza = 0;
-volatile uint16_t adc[4];
-//float dac1_volt = 0.5;
-//float dac2_volt = 0.5;
-//uint8_t dac1_byte;
-//uint8_t dac2_byte;
+float dac1_volt = 0.5;
+float dac2_volt = 0.5;
+uint8_t dac1_byte;
+uint8_t dac2_byte;
 uint16_t index_rot = 0;
 uint16_t index_grip=0;
 char rxData[30];
@@ -117,30 +116,30 @@ char txData[64] = {'m', 'a', 's', 'a', 'R', 0x00 };
 uint8_t rxPointer = 0;
 uint8_t rxBuffer;
 char rxFlag;
-int  encGrip; // Tim 2
-int  encRot; // Tim 5
-int  positionRot = 0;
 
-// the motor context
 motor_ctx gMotor ;
-/********************************************************************/
-// End Application stuff
-/********************************************************************/
+
+uint32_t adcCnt = 0;
+
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
+
+static uint32_t getDiff(uint16_t* arr, int idx)
+{
+
+}
 
 
 int main(void) {
 	/* USER CODE BEGIN 1 */
-
 	int loop_counter = 0;
+
+	int adc0filter=5, adc1filter=5;
+	int busyGrip=0, busyRotate=0, initReqFlag = 0;
+
 	memset(&gMotor, 0, sizeof(motor_ctx));
 	gMotor.initState = 0;
-	gMotor.dac1_volt = 0.5f;
-	gMotor.dac2_volt = 0.5f;
-
 	test_flag = 0;
-	uint16_t adc_history[2][10] = { { 0 } };
-
-
 	/* USER CODE END 1 */
 	/* MCU Configuration--------------------------------------------------------*/
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
@@ -165,13 +164,13 @@ int main(void) {
 	/* USER CODE BEGIN 2 */
 	//----------------------------------- Config  PHF \/
 	HAL_TIM_Base_Start_IT(&htim1); // Enable IRQ Tim 1
-	HAL_DAC_Start(&gMotor.hdac, DAC_CHANNEL_1);
-	HAL_DAC_Start(&gMotor.hdac, DAC_CHANNEL_2);
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adc, 4);
-	gMotor.dac1_byte = (uint8_t) ((gMotor.dac1_volt / 3.3) * 255);
-	gMotor.dac2_byte = (uint8_t) ((gMotor.dac2_volt / 3.3) * 255);
-	HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, gMotor.dac1_byte);
-	HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, gMotor.dac2_byte);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_2);
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) gMotor.adc, 4);
+	dac1_byte = (uint8_t) ((dac1_volt / 3.3) * 255);
+	dac2_byte = (uint8_t) ((dac2_volt / 3.3) * 255);
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, dac1_byte);
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, dac2_byte);
 	HAL_UART_Receive_IT(&huart6, &rxBuffer, 1);
 	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_ALL);
@@ -182,11 +181,20 @@ int main(void) {
 	HAL_GPIO_WritePin(GPIOB, MS2_GRIP_Pin, 1);
 	HAL_GPIO_WritePin(GPIOA, MS3_GRIP_Pin, 1);
 
+	// pepare motor data
+	 char msg[32], help[128];
+	 memset(msg, 0, sizeof(msg));
+	 memset(help, 0, sizeof(help));
+
+	gMotor.hdac = &hdac;
+	gMotor.dac1_volt = dac1_volt;
+	gMotor.dac2_volt = dac2_volt;
 	//   void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)    -  vika podprograma pri napulnen uart bufer ????
 	//-------------------------------- Config End   PHF
 	/* USER CODE END 2 */
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+	int requestHelp = 0;
 	for (;;) {
 		//-------------------------------------------------------------------------------------- PHF
 		//	  int a;
@@ -204,16 +212,16 @@ int main(void) {
 
 			if (rxBuffer == 0x0D) {   // call - analyze
 				if (!strncmp(rxData, FF_Open, strlen(FF_Open))) {
+					OpenMotor(&gMotor);
 					memset(rxData, 0, sizeof(rxData));
 					test_flag = 1;
-					gMotor.dac1_volt = 38;
-					HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
+//					gMotor.dac1_volt = 38;
+//					HAL_DAC_SetValue(gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Close, strlen(FF_Close))) {
+					CloseMotor(&gMotor);
 					memset(rxData, 0, sizeof(rxData));
 					test_flag = 0;
-					gMotor.dac1_volt = 8;
-					HAL_DAC_SetValue(&gMotor.hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (uint8_t)gMotor.dac1_volt);
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Init, strlen(FF_Init))) {
 					memset(rxData, 0, sizeof(rxData));
@@ -222,16 +230,19 @@ int main(void) {
 				} else if (!strncmp(rxData, FF_Left, strlen(FF_Left))) {
 					int test1, test2;
 					FF_parse_args(rxData, &test1, &test2);
+					RotateLeft(&gMotor, test1, test2);
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Right, strlen(FF_Right))) {
 					int test1, test2;
 					FF_parse_args(rxData, &test1, &test2);
+					RotateRight(&gMotor, test1, test2);
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
 				} else if (!strncmp(rxData, FF_Help, strlen(FF_Help))) {
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
+					requestHelp = 1;
 				} else if (!strncmp(rxData, FF_Status, strlen(FF_Status))) {
 					MotorStatus(&gMotor);
 					memset(rxData, 0, sizeof(rxData));
@@ -239,98 +250,114 @@ int main(void) {
 				} else {
 					memset(rxData, 0, sizeof(rxData));
 					rxPointer = 0;
+
 				}
 			}
 		}
+
 		InitMotor(&gMotor);
 
-		int adc_h_it = 0;
+
 		if (loop_counter > FF_DELAY_COUNTER) {
-			// do work
-			adc_history[0][adc_h_it++ % 10] = adc[0];
-			adc_history[1][adc_h_it++ % 10] = adc[1];
+
+			if (gMotor.adc[0] < 500)
+			{
+				adc0filter--;
+			}
+			else if (gMotor.adc[0] > 600)
+			{
+				adc0filter++;
+			}
+
+			if (gMotor.adc[1] < 500)
+			{
+				adc1filter--;
+			}
+			else if (gMotor.adc[1] > 600)
+			{
+				adc1filter++;
+			}
+
+
+			if (adc0filter > 10)
+				adc0filter = 10;
+			else if (adc0filter < 0)
+				adc0filter = 0;
+
+			if (adc1filter > 10)
+				adc1filter = 10;
+			else if (adc1filter < 0)
+				adc1filter = 0;
+
+			if (gMotor.initState == 1 && gMotor.motorRequests == RequestFree
+					&& adc0filter == 10 && busyRotate == 0)
+			{
+				int volt = (gMotor.adc[0] - 600) / 12;
+				busyRotate = 1;
+				RotateRight(&gMotor, 6000, volt);
+			}
+
+			if (gMotor.initState == 1 && gMotor.motorRequests == RequestFree
+								&& adc0filter == 0 && busyRotate == 1)
+			{
+				busyRotate = 0;
+				RotateLeft(&gMotor, -1, -1);
+			}
+
+
+			if (gMotor.initState == 1 && gMotor.motorRequests == RequestFree
+											&& adc1filter == 10 && busyGrip == 0)
+			{
+				busyGrip = 1;
+				CloseMotor(&gMotor);
+			}
+
+			if (gMotor.initState == 1 && gMotor.motorRequests == RequestFree
+														&& adc1filter == 0 && busyGrip == 1)
+			{
+				busyGrip = 0;
+				OpenMotor(&gMotor);
+			}
+
+
+			if (adc0filter == 10 && adc1filter == 10 && gMotor.initState == 0)
+			{
+				initReqFlag = 1;
+			}
+
+			if (adc0filter == 0 && adc1filter == 0 && initReqFlag == 1 && gMotor.initState == 0)
+			{
+				gMotor.initState = 2;
+			}
+
 			loop_counter = 0;
 		} else {
 			loop_counter++;
 		}
 
-		//	  if (HAL_GPIO_ReadPin(GPIOC,ROT_INDEX_Pin) == 1)
-		//	  		{HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
-		//	  else {HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);}
 
-		//	  	  if (HAL_GPIO_ReadPin(GPIOB,GRIP_INDEX_Pin) == 1)
-		//	  	  		{HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
-		//	  	  else {HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);}
+		 if (requestHelp)
+		 {
+			 requestHelp = 0;
+			 snprintf(help, sizeof(help),
+			 "Commands: status, init, open, close, left/right [Torque 0-150] [Steps 0-30000]\r\n");
+			 FF_UPrint(&huart6, help, sizeof(help));
+		 }
 
-		//	  if (encRot == 0)
-		//	  		{HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);}
-		//	  else {HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
-
-		encRot = TIM5->CNT;
-		encGrip = TIM2->CNT;
-
-#if 0
-		if (rxBuffer == 0x61) // malko "a" za 1 stupka
-		{ // increment rot s 1 poziciq
-			HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 1);// step
-			for (int i = 0; i < 10; i++);
-			HAL_GPIO_WritePin(GPIOA, STEP_ROT_Pin, 0);
-			positionRot++;
-			rxBuffer = 0;
+		if (gMotor.motorRequests == RequestOk)
+		{
+			gMotor.motorRequests = RequestFree;
+			snprintf(msg, sizeof(msg), "Ready Ok!\r\n");
+			FF_UPrint(&huart6, msg, sizeof(msg));
 		}
-
-		if (rxBuffer == 0x64)  // malko "d"
-		{	// disable motor power
-			HAL_GPIO_WritePin(GPIOB, SLEEP_ROT_Pin, 0);// disable rotor power
-			rxBuffer = 0;
+		if (gMotor.motorRequests == RequestFailed)
+		{
+			gMotor.motorRequests = RequestFree;
+			snprintf(msg, sizeof(msg), "Failed!\r\n");
+			FF_UPrint(&huart6, msg, sizeof(msg));
 		}
-
-		if (rxBuffer == 0x65)  // malko "e"
-
-		{	// enable motor power
-			HAL_GPIO_WritePin(GPIOB, SLEEP_ROT_Pin, 1);// enable rotor power
-			rxBuffer = 0;
-		}
-
-		if (rxBuffer == 0x63)  // malko "c"
-		{	// nulira enkodera na rotora
-			TIM5->CNT = 0;
-			positionRot = 0;
-			rxBuffer = 0;
-		}
-#endif
-
-
-#if 0
-		HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 1);
-		HAL_UART_Transmit_IT(&huart6, (uint8_t *)c, strlen(c)); // 5 e duljina na izprashtaniq paket, 10 e milisekundi timeout
-		HAL_Delay(FF_DELAY_TIME);
-#endif
-
-		// HAL_GPIO_TogglePin (GPIOC, LED_Pin);
-
-		//	  	  for (int i = 0; i < 100000; i++)
-		//	  		  HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);
-		//		 for (int i = 0; i < 100000; i++)
-		//		 HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);
-		//  for (int i = 0; i < 100000; i++)
-		// if ( proba > 0 )
-		// {
-		//  HAL_GPIO_TogglePin (GPIOC, LED_Pin);
-		//  HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);}
-		// else { HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
-
-		//--------------------------------------------------------------------------------------- PHF
-		/* USER CODE END WHILE */
-
-		/* USER CODE BEGIN 3 */
 	}
-	//  -------   bi trqbvalo tuka da sa mi funkciite ????????
-	//  if (!strncmp(rxBuffer, "init", 4))
-	//  {
-	//	  // tuka vikam funkciq inicializaciq
-	//  }
-	/* USER CODE END 3 */
+
 }
 
 
@@ -512,8 +539,8 @@ static void MX_DAC_Init(void)
   /* USER CODE END DAC_Init 1 */
   /**DAC Initialization 
   */
-  gMotor.hdac.Instance = DAC;
-  if (HAL_DAC_Init(&gMotor.hdac) != HAL_OK)
+  hdac.Instance = DAC;
+  if (HAL_DAC_Init(&hdac) != HAL_OK)
   {
     Error_Handler();
   }
@@ -521,13 +548,13 @@ static void MX_DAC_Init(void)
   */
   sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
-  if (HAL_DAC_ConfigChannel(&gMotor.hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
   /**DAC channel OUT2 config 
   */
-  if (HAL_DAC_ConfigChannel(&gMotor.hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK)
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }

@@ -51,5 +51,4 @@
 #define CAN_SILENT_GPIO_Port GPIOB
 
 
-
 #endif /* INC_DEFS_H_ */

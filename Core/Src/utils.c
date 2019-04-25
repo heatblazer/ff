@@ -6,6 +6,7 @@
  */
 
 #include "utils.h"
+#include "motor.h"
 
 #define FF_IS_DIGIT(x) ((x>='0') && (x <= '9'))
 #define FF_UART_DELAY_TIME 100
@@ -14,11 +15,11 @@
 
 void FF_UPrint(UART_HandleTypeDef* uart, const char* message, size_t size)
 {
-	if (!message || uart)
+	if (!message || !uart)
 		return;
 	HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 1);
 	HAL_UART_Transmit_IT(uart, (uint8_t*)message, size);  // 5 e duljina na izprashtaniq paket, 10 e milisekundi timeout
-	HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 0);
+	//HAL_GPIO_WritePin(GPIOC, RS485SW_Pin, 0);
 	HAL_Delay(FF_UART_DELAY_TIME);
 }
 
