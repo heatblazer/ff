@@ -9,22 +9,6 @@
 #include "main.h"
 #include "motor.h"
 
-//
-//	Details:{Instance = 0x40010000, Init = {Prescaler = 2, CounterMode = 0, Period = 2500, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_READY}
-
-
-//	  if (HAL_GPIO_ReadPin(GPIOC,ROT_INDEX_Pin) == 1)
-//	  		{HAL_GPIO_WritePin(GPIOC, LED_Pin, 1);}
-//	  else {HAL_GPIO_WritePin(GPIOC, LED_Pin, 0);}
-
-#if 0
-dac1_byte = (uint8_t) ((dac1_volt / 3.3) * 255);
-	dac2_byte = (uint8_t) ((dac2_volt / 3.3) * 255);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, dac1_byte);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, dac2_byte);
-#endif
-
-
 extern UART_HandleTypeDef huart6;
 
 
